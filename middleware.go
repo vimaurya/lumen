@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -13,7 +12,7 @@ type Hit struct {
 	Path         string
 	HashedUserId string
 	Referrer     string
-	Timestamp    string
+	Timestamp    int64
 }
 
 func generateHash(ip, ua string) string {
@@ -46,7 +45,7 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 				Path:         path,
 				HashedUserId: visitorId,
 				Referrer:     ref,
-				Timestamp:    strconv.Itoa(int(time.Now().Unix())),
+				Timestamp:    time.Now().Unix(),
 			})
 		}()
 		next.ServeHTTP(w, r)

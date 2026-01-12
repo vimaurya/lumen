@@ -24,7 +24,7 @@ func InitDB() error {
 			path varchar,
 			hashuserid varchar,
 			referrer varchar,
-			timestamp string
+			timestamp INTEGER 
 		)
 	`
 	_, err = db.Exec(query)
@@ -83,5 +83,5 @@ func flush(batch []Hit) error {
 		}
 	}
 
-	return nil
+	return tx.Commit()
 }
