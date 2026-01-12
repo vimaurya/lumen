@@ -1,15 +1,45 @@
 package main
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+)
 
 func main() {
-	mux := http.NewServeMux()
+	err := InitDB()
+	if err != nil {
+		log.Panicf("failed to init db : %w", err)
+	}
 
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("this is analytics!"))
-	})
+	done := make(chan bool)
+	go func() {
+		StartWorker()
+		done <- true
+	}()
 
-	wrappedMux := AnalyticsMiddleware(mux)
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: AnalyticsMiddleware(http.DefaultServeMux),
+	}
 
-	http.ListenAndServe(":8080", wrappedMux)
+	go func() {
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe: %v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
+	log.Println("shutting down...")
+
+	server.Close()
+
+	close(HitBuffer)
+
+	<-done
+
+	log.Println("flushed...")
 }
