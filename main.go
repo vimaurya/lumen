@@ -1,16 +1,20 @@
 package main
 
 import (
+	_ "embed"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 )
 
+//go:embed resources/visit.jpg
+var pixelByte []byte
+
 func main() {
 	err := InitDB()
 	if err != nil {
-		log.Panicf("failed to init db : %w", err)
+		log.Panicf("failed to init db : %v", err)
 	}
 
 	done := make(chan bool)
@@ -19,9 +23,16 @@ func main() {
 		done <- true
 	}()
 
+	mux := http.DefaultServeMux
+
+	mux.Handle("/visit.jpg", AnalyticsMiddleware(http.HandlerFunc(pixelHandler)))
+	mux.HandleFunc("/admin", DashboardHandler)
+
+	wrappedMux := AnalyticsMiddleware(mux)
+
 	server := &http.Server{
 		Addr:    ":8080",
-		Handler: AnalyticsMiddleware(http.DefaultServeMux),
+		Handler: wrappedMux,
 	}
 
 	go func() {
@@ -42,4 +53,10 @@ func main() {
 	<-done
 
 	log.Println("flushed...")
+}
+
+func pixelHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/gif")
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Write(pixelByte)
 }

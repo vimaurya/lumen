@@ -20,7 +20,7 @@ func InitDB() error {
 	db.Exec("synchronous=NORMAL;")
 
 	query := `
-		create table hit (
+		create table if not exists hit (
 			path varchar,
 			hashuserid varchar,
 			referrer varchar,
