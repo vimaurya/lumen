@@ -6,13 +6,31 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/oschwald/geoip2-golang"
+	"github.com/ua-parser/uap-go/uaparser"
 )
 
 //go:embed resources/visit.jpg
 var pixelByte []byte
 
+var clientParser *uaparser.Parser
+
 func main() {
-	err := InitDB()
+	cdb, err := geoip2.Open("GeoLite2-City.mmdb")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	GeoDB = cdb
+	defer GeoDB.Close()
+
+	clientParser, err = uaparser.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = InitDB()
 	if err != nil {
 		log.Panicf("failed to init db : %v", err)
 	}
@@ -25,7 +43,7 @@ func main() {
 
 	mux := http.DefaultServeMux
 
-	mux.Handle("/visit.jpg", AnalyticsMiddleware(http.HandlerFunc(pixelHandler)))
+	mux.HandleFunc("/visit.jpg", pixelHandler)
 	mux.HandleFunc("/admin", DashboardHandler)
 
 	wrappedMux := AnalyticsMiddleware(mux)

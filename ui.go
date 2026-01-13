@@ -56,7 +56,6 @@ type DashboardData struct {
 }
 
 func DashboardHandler(w http.ResponseWriter, r *http.Request) {
-	// 1. Query the DB for Top Pages
 	topPagesQuery := `
 		SELECT path, count(path) as views from hit
 		where timestamp > ?
@@ -80,7 +79,7 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 		pages = append(pages, ps)
 	}
-	// 2. Query the DB for Total Count
+
 	totalCountQuery := `
 		SELECT count(*) as total_count from hit
 		where timestamp > ?
@@ -97,7 +96,7 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 		TotalCount:  totalCount,
 		CurrentTime: time.Now().Format("2006-01-02"),
 	}
-	// 3. Render the template:
+
 	tmpl := template.Must(template.New("dashboard").Parse(dashboardTemplate))
 	tmpl.Execute(w, data)
 }
