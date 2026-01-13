@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
+	"strings"
 	"time"
 )
 
@@ -13,7 +13,7 @@ type Hit struct {
 	Path         string
 	HashedUserId string
 	Referrer     string
-	Timestamp    string
+	Timestamp    int64
 }
 
 func generateHash(ip, ua string) string {
@@ -35,6 +35,14 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
+		if path == "/admin" ||
+			strings.HasSuffix(path, ".js") ||
+			strings.HasSuffix(path, ".ico") ||
+			strings.HasSuffix(path, ".css") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		ua := r.Header.Get("User-Agent")
 		ip := r.RemoteAddr
 		ref := r.Header.Get("Referrer")
@@ -46,7 +54,7 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 				Path:         path,
 				HashedUserId: visitorId,
 				Referrer:     ref,
-				Timestamp:    strconv.Itoa(int(time.Now().Unix())),
+				Timestamp:    time.Now().Unix(),
 			})
 		}()
 		next.ServeHTTP(w, r)
