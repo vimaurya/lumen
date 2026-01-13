@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -69,10 +70,27 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
+		ignoredExtensions := map[string]bool{
+			".js":    true,
+			".css":   true,
+			".map":   true,
+			".png":   true,
+			".jpg":   true,
+			".jpeg":  true,
+			".ico":   true,
+			".svg":   true,
+			".woff":  true,
+			".woff2": true,
+			".json":  true,
+		}
+
+		ext := ""
+		if dot := strings.LastIndex(path, "."); dot != -1 {
+			ext = strings.ToLower(path[dot:])
+		}
+
 		if path == "/admin" ||
-			strings.HasSuffix(path, ".js") ||
-			strings.HasSuffix(path, ".ico") ||
-			strings.HasSuffix(path, ".css") {
+			ignoredExtensions[ext] {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -82,6 +100,8 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, Status: http.StatusOK}
 
 		next.ServeHTTP(sw, r)
+
+		log.Printf("path : %s status : %v", path, sw.Status)
 
 		duration := time.Since(start).Milliseconds()
 
@@ -108,4 +128,9 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 			})
 		}()
 	})
+}
+
+func (w *statusWriter) WriteHeader(status int) {
+	w.Status = status
+	w.ResponseWriter.WriteHeader(status)
 }

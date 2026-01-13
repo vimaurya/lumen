@@ -5,31 +5,38 @@ import (
 	"log"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 var DB *sql.DB
 
 func InitDB() error {
-	db, err := sql.Open("sqlite3", "analytics.db")
+	var err error
+	DB, err = sql.Open("sqlite", "analytics.db")
 	if err != nil {
 		return err
 	}
-
-	db.Exec("journal_mode=WAL;")
-	db.Exec("synchronous=NORMAL;")
+	DB.Exec("journal_mode=WAL;")
+	DB.Exec("synchronous=NORMAL;")
 
 	query := `
 		create table if not exists hit (
 			path varchar,
 			hashuserid varchar,
 			referrer varchar,
-			timestamp INTEGER 
+			timestamp INTEGER,
+			country varchar,
+			browser varchar,
+			device varchar,
+			duration INTEGER,
+			operating_system varchar,
+			status INTEGER
 		)
 	`
-	_, err = db.Exec(query)
-
-	DB = db
+	_, err = DB.Exec(query)
+	if err != nil {
+		log.Printf("failed to create table : %v", err)
+	}
 	return err
 }
 
@@ -49,7 +56,7 @@ func StartWorker() {
 			if len(batch) > 100 {
 				err := flush(batch)
 				if err != nil {
-					log.Fatal("failed to flush into database...")
+					log.Printf("failed to flush into database... %v", err)
 				}
 				batch = batch[:0]
 			}
@@ -57,7 +64,7 @@ func StartWorker() {
 			if len(batch) > 0 {
 				err := flush(batch)
 				if err != nil {
-					log.Fatal("failed to flush into database...")
+					log.Printf("failed to flush into database... %v", err)
 				}
 				batch = batch[:0]
 			}
@@ -72,11 +79,14 @@ func flush(batch []Hit) error {
 	}
 
 	for _, hit := range batch {
-		query := `
-			INSERT INTO hit(path, hashuserid, referrer, timestamp) VALUES(?, ?, ?, ?)
-		`
 
-		_, err := tx.Exec(query, hit.Path, hit.HashedUserId, hit.Referrer, hit.Timestamp)
+		query := `INSERT INTO hit(path, hashuserid, referrer, timestamp, country, browser,
+							device, duration, operating_system, status) 
+          VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+		_, err := tx.Exec(query, hit.Path, hit.HashedUserId, hit.Referrer, hit.Timestamp,
+			hit.Country, hit.Browser, hit.Device, hit.Duration,
+			hit.OperatingSystem, hit.Status)
 		if err != nil {
 			tx.Rollback()
 			return err

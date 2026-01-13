@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 
@@ -17,22 +19,21 @@ var pixelByte []byte
 var clientParser *uaparser.Parser
 
 func main() {
-	cdb, err := geoip2.Open("GeoLite2-City.mmdb")
+	err := InitDB()
+	if err != nil {
+		log.Panicf("failed to init db : %v", err)
+	}
+
+	GeoDB, err = geoip2.Open("GeoLite2-City.mmdb")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	GeoDB = cdb
 	defer GeoDB.Close()
 
 	clientParser, err = uaparser.New()
 	if err != nil {
 		log.Fatal(err)
-	}
-
-	err = InitDB()
-	if err != nil {
-		log.Panicf("failed to init db : %v", err)
 	}
 
 	done := make(chan bool)
@@ -41,15 +42,27 @@ func main() {
 		done <- true
 	}()
 
-	mux := http.DefaultServeMux
+	target, _ := url.Parse("http://localhost:8081")
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	originalDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		originalDirector(req)
+		req.Host = target.Host
+	}
+
+	mux := http.NewServeMux()
 
 	mux.HandleFunc("/visit.jpg", pixelHandler)
 	mux.HandleFunc("/admin", DashboardHandler)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		proxy.ServeHTTP(w, r)
+	})
 
 	wrappedMux := AnalyticsMiddleware(mux)
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    "localhost:8080",
 		Handler: wrappedMux,
 	}
 
