@@ -1,15 +1,12 @@
-package main
+package analytics
 
 import (
 	"crypto/sha256"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/oschwald/geoip2-golang"
 )
 
 type Hit struct {
@@ -30,40 +27,10 @@ type statusWriter struct {
 	Status int
 }
 
-var GeoDB *geoip2.Reader
-
 func generateHash(ip, ua string) string {
 	salt := time.Now().Format("2006-01-02")
 	hash := sha256.Sum256([]byte(extractIP(ip) + ua + salt))
 	return fmt.Sprintf("%x", hash)
-}
-
-func extractIP(ip string) string {
-	host, _, err := net.SplitHostPort(ip)
-	if err != nil {
-		return ip
-	}
-
-	return host
-}
-
-func getCountry(ip string) string {
-	parsedIP := net.ParseIP(extractIP(ip))
-
-	if parsedIP == nil {
-		return "Unknown"
-	}
-
-	record, err := GeoDB.City(parsedIP)
-	if err != nil {
-		return "Unknown"
-	}
-
-	if name, ok := record.Country.Names["en"]; ok {
-		return name
-	}
-
-	return record.Country.IsoCode
 }
 
 func AnalyticsMiddleware(next http.Handler) http.Handler {
@@ -111,7 +78,7 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 
 		visitorId := generateHash(ip, ua)
 
-		client := clientParser.Parse(ua)
+		client := ClientParser.Parse(ua)
 
 		go func() {
 			Collect(Hit{
@@ -122,7 +89,7 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 				Browser:         client.UserAgent.Family,
 				OperatingSystem: client.Os.Family,
 				Device:          client.Device.Family,
-				Country:         getCountry(ip),
+				Country:         getCountry(extractIP(ip)),
 				Status:          sw.Status,
 				Duration:        duration,
 			})

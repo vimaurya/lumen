@@ -1,10 +1,11 @@
-package main
+package storage
 
 import (
 	"database/sql"
 	"log"
 	"time"
 
+	"github.com/vimaurya/lumen/internal/analytics"
 	_ "modernc.org/sqlite"
 )
 
@@ -41,13 +42,13 @@ func InitDB() error {
 }
 
 func StartWorker() {
-	batch := make([]Hit, 0, 100)
+	batch := make([]analytics.Hit, 0, 100)
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case hit, ok := <-HitBuffer:
+		case hit, ok := <-analytics.HitBuffer:
 			if !ok && len(batch) > 0 {
 				flush(batch)
 				return
@@ -72,7 +73,7 @@ func StartWorker() {
 	}
 }
 
-func flush(batch []Hit) error {
+func flush(batch []analytics.Hit) error {
 	tx, err := DB.Begin()
 	if err != nil {
 		return err

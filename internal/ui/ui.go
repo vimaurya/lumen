@@ -1,10 +1,8 @@
-package main
+package ui
 
 import (
 	"html/template"
-	"log"
 	"net/http"
-	"time"
 )
 
 var dashboardTemplate = `
@@ -74,9 +72,9 @@ type PerformanceStat struct {
 type DashboardData struct {
 	TopPages       []PageStat
 	Performance    []PerformanceStat
-	TotalCount     int
-	UniqueVisitors int
-	AvgLatency     float64
+	TotalCount     int64
+	UniqueVisitors int64
+	AvgLatency     float32
 	ErrorRate      int
 	CurrentTime    string
 }
@@ -84,95 +82,17 @@ type DashboardData struct {
 func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	data := DashboardData{}
 
-	topPagesQuery := `
-		SELECT path, count(path) as views from hit
-		where timestamp > ?
-		group by path
-		order by views desc
-		limit 20;
-	`
-	topPages, err := DB.Query(topPagesQuery, time.Now().Unix()-86400)
-	if err != nil {
-		log.Fatalf("failed to query db for top pages : %v", err)
-	}
-	defer topPages.Close()
+	data.TopPages = topPages()
 
-	pages := []PageStat{}
-	for topPages.Next() {
-		var ps PageStat
-		err := topPages.Scan(&ps.Path, &ps.Views)
-		if err != nil {
-			log.Fatal(err)
-		}
+	data.TotalCount = totalCount()
 
-		pages = append(pages, ps)
-	}
+	data.AvgLatency = avgLatency()
 
-	data.TopPages = pages
+	data.ErrorRate = errorRate()
 
-	totalCountQuery := `
-		SELECT count(*) as total_count from hit
-		where timestamp > ?
-	`
+	data.UniqueVisitors = uniqueVisitors()
 
-	err = DB.QueryRow(totalCountQuery, time.Now().Unix()-86400).Scan(&data.TotalCount)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	avgLatencyQuery := `
-		SELECT COALESCE(AVG(duration), 0) FROM hit;
-	`
-
-	err = DB.QueryRow(avgLatencyQuery).Scan(&data.AvgLatency)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	errorRateQuery := `
-		SELECT COUNT(*) from hit where status >= 400 and timestamp > ?
-	`
-	err = DB.QueryRow(errorRateQuery, time.Now().Unix()-86400).Scan(&data.ErrorRate)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	uniqueVisitorsQuery := `
-		Select count(distinct hashuserid) from hit where timestamp > ?
-	`
-	err = DB.QueryRow(uniqueVisitorsQuery, time.Now().Unix()-86400).Scan(&data.UniqueVisitors)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var performanceAnalysis []PerformanceStat
-
-	performaceQuery := `
-		SELECT path, COALESCE(AVG(duration), 0) as Avg_dur
-		FROM hit
-		WHERE timestamp > ?
-		GROUP BY path 
-		ORDER BY avg_dur DESC
-		LIMIT 5
-`
-	rows, err := DB.Query(performaceQuery, time.Now().Unix()-86400)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	defer rows.Close()
-
-	for rows.Next() {
-		var ps PerformanceStat
-		err = rows.Scan(&ps.Path, &ps.Avg_dur)
-		if err != nil {
-			log.Fatalf("scan error : %v", err)
-			continue
-		}
-
-		performanceAnalysis = append(performanceAnalysis, ps)
-	}
-
-	data.Performance = performanceAnalysis
+	data.Performance = performance()
 
 	tmpl := template.Must(template.New("dashboard").Parse(dashboardTemplate))
 	tmpl.Execute(w, data)
