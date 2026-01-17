@@ -1,7 +1,11 @@
 package analytics
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"net"
+	"strings"
+	"time"
 
 	"github.com/oschwald/geoip2-golang"
 	"github.com/ua-parser/uap-go/uaparser"
@@ -21,6 +25,21 @@ func Collect(hit Hit) {
 	default:
 		dropCounter += 1
 	}
+}
+
+func getSessionId(ip string, ua string) string {
+	window := time.Now().Unix() / 1800
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%d", ip, ua, window)))
+	return fmt.Sprintf("%x", hash)[:16]
+}
+
+func isBot(ua string) bool {
+	client := ClientParser.Parse(ua)
+	isBot := strings.Contains(strings.ToLower(ua), "bot") ||
+		strings.Contains(strings.ToLower(ua), "crawler") ||
+		client.Device.Family == "Spider"
+
+	return isBot
 }
 
 func extractIP(ip string) string {

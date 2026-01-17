@@ -23,38 +23,24 @@ var dashboardTemplate = `
     </style>
 </head>
 <body>
-    <h1>System Insights</h1>
-    
-    <div class="grid">
-        <div class="stat-card"><h3>Views</h3><p>{{.TotalCount}}</p></div>
-        <div class="stat-card"><h3>Uniques</h3><p>{{.UniqueVisitors}}</p></div>
-        <div class="stat-card"><h3>Avg Speed</h3><p>{{.AvgLatency}}ms</p></div>
-        <div class="stat-card"><h3 class="error-text">Errors</h3><p class="error-text">{{.ErrorRate}}</p></div>
-    </div>
+	<div class="main-card">
+			<h3>System Health (Infrastructure)</h3>
+			<div class="grid">
+					<div class="stat-card"><h3>Views</h3><p>{{.TotalCount}}</p></div>
+					<div class="stat-card"><h3>Avg Speed</h3><p>{{printf "%.2f" .AvgLatency}}ms</p></div>
+					<div class="stat-card"><h3>Uniques (IP)</h3><p>{{.UniqueVisitors}}</p></div>
+					<div class="stat-card"><h3 class="error-text">Errors</h3><p class="error-text">{{.ErrorRate}}</p></div>
+			</div>
+	</div>
 
-    <div class="main-card">
-        <h2>Slowest Endpoints (Performance Debt)</h2>
-        <table>
-            <thead><tr><th>Path</th><th>Avg Latency</th></tr></thead>
-            <tbody>
-                {{range .Performance}}
-                <tr><td>{{.Path}}</td><td><strong>{{printf "%.2f" .Avg_dur}}ms</strong></td></tr>
-                {{end}}
-            </tbody>
-        </table>
-    </div>
-
-    <div class="main-card">
-        <h2>Top Content</h2>
-        <table>
-            <thead><tr><th>URL Path</th><th>Views</th></tr></thead>
-            <tbody>
-                {{range .TopPages}}
-                <tr><td>{{.Path}}</td><td>{{.Views}}</td></tr>
-                {{end}}
-            </tbody>
-        </table>
-    </div>
+	<div class="main-card">
+			<h3>Visitor Engagement (Behavior)</h3>
+			<div class="grid">
+					<div class="stat-card"><h3>Visits (Sessions)</h3><p>{{.UniqueSessions}}</p></div>
+					<div class="stat-card"><h3>Avg Session Time</h3><p>{{.AvgSessionTime}}</p></div>
+					<div class="stat-card"><h3>Bounce Rate</h3><p>{{printf "%.1f" .BounceRate}}%</p></div>
+					<div class="stat-card"><h3>Active Users</h3><p>Live</p></div> </div>
+	</div>
 </body>
 </html>
 `
@@ -77,22 +63,27 @@ type DashboardData struct {
 	AvgLatency     float32
 	ErrorRate      int
 	CurrentTime    string
+	UniqueSessions int
+	AvgSessionTime string
+	BounceRate     float64
 }
 
 func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	data := DashboardData{}
 
-	data.TopPages = topPages()
+	topPages(&data.TopPages)
 
-	data.TotalCount = totalCount()
+	totalCount(&data.TotalCount)
 
-	data.AvgLatency = avgLatency()
+	avgLatency(&data.AvgLatency)
 
-	data.ErrorRate = errorRate()
+	errorRate(&data.ErrorRate)
 
-	data.UniqueVisitors = uniqueVisitors()
+	uniqueVisitors(&data.UniqueVisitors)
 
-	data.Performance = performance()
+	performance(&data.Performance)
+
+	uniqueSessions(&data.UniqueSessions, &data.AvgSessionTime)
 
 	tmpl := template.Must(template.New("dashboard").Parse(dashboardTemplate))
 	tmpl.Execute(w, data)

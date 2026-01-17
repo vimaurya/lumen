@@ -1,13 +1,14 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 	"time"
 
 	"github.com/vimaurya/lumen/internal/storage"
 )
 
-func topPages() []PageStat {
+func topPages(pages *[]PageStat) {
 	topPagesQuery := `
 		SELECT path, count(path) as views from hit
 		where timestamp > ?
@@ -21,7 +22,6 @@ func topPages() []PageStat {
 	}
 	defer topPages.Close()
 
-	pages := []PageStat{}
 	for topPages.Next() {
 		var ps PageStat
 		err := topPages.Scan(&ps.Path, &ps.Views)
@@ -30,71 +30,56 @@ func topPages() []PageStat {
 			continue
 		}
 
-		pages = append(pages, ps)
+		*pages = append(*pages, ps)
 	}
-
-	return pages
 }
 
-func totalCount() int64 {
+func totalCount(count *int64) {
 	totalCountQuery := `
 		SELECT count(*) as total_count from hit
 		where timestamp > ?
 	`
-	var count int64
-	err := storage.DB.QueryRow(totalCountQuery, time.Now().Unix()-86400).Scan(&count)
+	err := storage.DB.QueryRow(totalCountQuery, time.Now().Unix()-86400).Scan(count)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return count
 }
 
-func avgLatency() float32 {
+func avgLatency(avg *float32) {
 	avgLatencyQuery := `
-		SELECT COALESCE(AVG(duration), 0) FROM hit where timestamp > ?;
+		SELECT COALESCE(ROUND(CAST(AVG(duration) AS NUMERIC), 2), 0) 
+		FROM hit 
+		WHERE timestamp > ?;
 	`
-	var avg float32
-
-	err := storage.DB.QueryRow(avgLatencyQuery, time.Now().Unix()-86400).Scan(&avg)
+	err := storage.DB.QueryRow(avgLatencyQuery, time.Now().Unix()-86400).Scan(avg)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("avgLatency err : %v", err)
 	}
-
-	return avg
 }
 
-func errorRate() int {
+func errorRate(rate *int) {
 	errorRateQuery := `
 		SELECT COUNT(*) from hit where status >= 400 and timestamp > ?
 	`
 
-	var rate int
-	err := storage.DB.QueryRow(errorRateQuery, time.Now().Unix()-86400).Scan(&rate)
+	err := storage.DB.QueryRow(errorRateQuery, time.Now().Unix()-86400).Scan(rate)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return rate
 }
 
-func uniqueVisitors() int64 {
+func uniqueVisitors(uniquevis *int64) {
 	uniqueVisitorsQuery := `
 		Select count(distinct hashuserid) from hit where timestamp > ?
 	`
-	var uniquevis int64
 
-	err := storage.DB.QueryRow(uniqueVisitorsQuery, time.Now().Unix()-86400).Scan(&uniquevis)
+	err := storage.DB.QueryRow(uniqueVisitorsQuery, time.Now().Unix()-86400).Scan(uniquevis)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return uniquevis
 }
 
-func performance() []PerformanceStat {
-	var performanceAnalysis []PerformanceStat
-
+func performance(performanceAnalysis *[]PerformanceStat) {
 	performaceQuery := `
 		SELECT path, COALESCE(AVG(duration), 0) as Avg_dur
 		FROM hit
@@ -118,8 +103,27 @@ func performance() []PerformanceStat {
 			continue
 		}
 
-		performanceAnalysis = append(performanceAnalysis, ps)
+		*performanceAnalysis = append(*performanceAnalysis, ps)
+	}
+}
+
+func uniqueSessions(uniqueSessions *int, avgSessionTime *string) {
+	query := `
+		Select	
+			COUNT(DISTINCT sessionid),
+			AVG(session_len)
+			FROM (
+				SELECT (MAX(timestamp) - MIN(timestamp)) as session_len 
+				FROM hit 
+				WHERE isbot = 0 
+				GROUP BY sessionid
+			)	
+	`
+	var avgSeconds float64
+	err := storage.DB.QueryRow(query).Scan(uniqueSessions, &avgSeconds)
+	if err != nil {
+		log.Printf("uniqueSessions err : %v", err)
 	}
 
-	return performanceAnalysis
+	*avgSessionTime = fmt.Sprintf("%.0fs", avgSeconds)
 }

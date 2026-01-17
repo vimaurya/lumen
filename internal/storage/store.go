@@ -31,7 +31,11 @@ func InitDB() error {
 			device varchar,
 			duration INTEGER,
 			operating_system varchar,
-			status INTEGER
+			status INTEGER,
+			method varchar,
+			requestsize INTEGER,
+			sessionid TEXT,
+			isbot boolean
 		)
 	`
 	_, err = DB.Exec(query)
@@ -79,15 +83,29 @@ func flush(batch []analytics.Hit) error {
 		return err
 	}
 
+	query := `INSERT INTO hit(
+				path, hashuserid, referrer, timestamp, country, 
+			browser, device, duration, operating_system, status,
+			method, requestsize, sessionid, isbot
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
 	for _, hit := range batch {
-
-		query := `INSERT INTO hit(path, hashuserid, referrer, timestamp, country, browser,
-							device, duration, operating_system, status) 
-          VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-
-		_, err := tx.Exec(query, hit.Path, hit.HashedUserId, hit.Referrer, hit.Timestamp,
-			hit.Country, hit.Browser, hit.Device, hit.Duration,
-			hit.OperatingSystem, hit.Status)
+		_, err := tx.Exec(query,
+			hit.Path,
+			hit.HashedUserId,
+			hit.Referrer,
+			hit.Timestamp,
+			hit.Country,
+			hit.Browser,
+			hit.Device,
+			hit.Duration,
+			hit.OperatingSystem,
+			hit.Status,
+			hit.Method,
+			hit.RequestSize,
+			hit.SessionId,
+			hit.IsBot,
+		)
 		if err != nil {
 			tx.Rollback()
 			return err

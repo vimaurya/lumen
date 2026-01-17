@@ -20,6 +20,10 @@ type Hit struct {
 	OperatingSystem string
 	Status          int
 	Timestamp       int64
+	Method          string
+	RequestSize     int
+	SessionId       string
+	IsBot           bool
 }
 
 type statusWriter struct {
@@ -75,7 +79,9 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 		ua := r.Header.Get("User-Agent")
 		ip := r.RemoteAddr
 		ref := r.Header.Get("Referrer")
+		method := r.Method
 
+		requestSize := r.ContentLength
 		visitorId := generateHash(ip, ua)
 
 		client := ClientParser.Parse(ua)
@@ -92,6 +98,10 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 				Country:         getCountry(extractIP(ip)),
 				Status:          sw.Status,
 				Duration:        duration,
+				Method:          method,
+				RequestSize:     int(requestSize),
+				SessionId:       getSessionId(extractIP(ip), ua),
+				IsBot:           isBot(ua),
 			})
 		}()
 	})
