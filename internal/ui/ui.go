@@ -133,15 +133,7 @@ func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 
 	fetchGlobalMetrics(&data)
 
-	avgLatency(&data.AvgLatency)
-
-	errorRate(&data.ErrorRate)
-
 	performance(&data.Performance)
-
-	uniqueSessions(&data.UniqueSessions, &data.AvgSessionTime)
-
-	bounceRate(&data.BounceRate)
 
 	topCountries(&data.TopCountries)
 
