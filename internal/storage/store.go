@@ -1,10 +1,11 @@
-package main
+package storage
 
 import (
 	"database/sql"
 	"log"
 	"time"
 
+	"github.com/vimaurya/lumen/internal/analytics"
 	_ "modernc.org/sqlite"
 )
 
@@ -12,10 +13,11 @@ var DB *sql.DB
 
 func InitDB() error {
 	var err error
-	DB, err = sql.Open("sqlite", "analytics.db")
+	DB, err = sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return err
 	}
+
 	DB.Exec("journal_mode=WAL;")
 	DB.Exec("synchronous=NORMAL;")
 
@@ -30,24 +32,37 @@ func InitDB() error {
 			device varchar,
 			duration INTEGER,
 			operating_system varchar,
-			status INTEGER
+			status INTEGER,
+			method varchar,
+			requestsize INTEGER,
+			sessionid TEXT,
+			isbot boolean
 		)
 	`
 	_, err = DB.Exec(query)
 	if err != nil {
-		log.Printf("failed to create table : %v", err)
+		log.Fatalf("CRITICAL SQL ERROR: %v", err)
 	}
-	return err
+
+	indexes := `
+			CREATE INDEX IF NOT EXISTS idx_hit_timestamp ON hit(timestamp);
+				CREATE INDEX IF NOT EXISTS idx_hit_sessionid ON hit(sessionid);
+	`
+
+	DB.Exec(indexes)
+
+	log.Println("Database successfully created in memory.")
+	return nil
 }
 
 func StartWorker() {
-	batch := make([]Hit, 0, 100)
+	batch := make([]analytics.Hit, 0, 100)
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case hit, ok := <-HitBuffer:
+		case hit, ok := <-analytics.HitBuffer:
 			if !ok && len(batch) > 0 {
 				flush(batch)
 				return
@@ -72,21 +87,35 @@ func StartWorker() {
 	}
 }
 
-func flush(batch []Hit) error {
+func flush(batch []analytics.Hit) error {
 	tx, err := DB.Begin()
 	if err != nil {
 		return err
 	}
 
+	query := `INSERT INTO hit(
+				path, hashuserid, referrer, timestamp, country, 
+			browser, device, duration, operating_system, status,
+			method, requestsize, sessionid, isbot
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
 	for _, hit := range batch {
-
-		query := `INSERT INTO hit(path, hashuserid, referrer, timestamp, country, browser,
-							device, duration, operating_system, status) 
-          VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-
-		_, err := tx.Exec(query, hit.Path, hit.HashedUserId, hit.Referrer, hit.Timestamp,
-			hit.Country, hit.Browser, hit.Device, hit.Duration,
-			hit.OperatingSystem, hit.Status)
+		_, err := tx.Exec(query,
+			hit.Path,
+			hit.HashedUserId,
+			hit.Referrer,
+			hit.Timestamp,
+			hit.Country,
+			hit.Browser,
+			hit.Device,
+			hit.Duration,
+			hit.OperatingSystem,
+			hit.Status,
+			hit.Method,
+			hit.RequestSize,
+			hit.SessionId,
+			hit.IsBot,
+		)
 		if err != nil {
 			tx.Rollback()
 			return err

@@ -1,7 +1,6 @@
 package main
 
 import (
-	_ "embed"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -11,34 +10,32 @@ import (
 
 	"github.com/oschwald/geoip2-golang"
 	"github.com/ua-parser/uap-go/uaparser"
+	"github.com/vimaurya/lumen/internal/analytics"
+	"github.com/vimaurya/lumen/internal/storage"
+	"github.com/vimaurya/lumen/internal/ui"
 )
 
-//go:embed resources/visit.jpg
-var pixelByte []byte
-
-var clientParser *uaparser.Parser
-
 func main() {
-	err := InitDB()
+	err := storage.InitDB()
 	if err != nil {
 		log.Panicf("failed to init db : %v", err)
 	}
 
-	GeoDB, err = geoip2.Open("GeoLite2-City.mmdb")
+	analytics.GeoDB, err = geoip2.Open("./resources/GeoLite2-City.mmdb")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer GeoDB.Close()
+	defer analytics.GeoDB.Close()
 
-	clientParser, err = uaparser.New()
+	analytics.ClientParser, err = uaparser.New()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	done := make(chan bool)
 	go func() {
-		StartWorker()
+		storage.StartWorker()
 		done <- true
 	}()
 
@@ -53,13 +50,13 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/visit.jpg", pixelHandler)
-	mux.HandleFunc("/admin", DashboardHandler)
+	mux.HandleFunc("/visit", visitHandler)
+	mux.HandleFunc("/admin", ui.DashboardHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		proxy.ServeHTTP(w, r)
 	})
 
-	wrappedMux := AnalyticsMiddleware(mux)
+	wrappedMux := analytics.AnalyticsMiddleware(mux)
 
 	server := &http.Server{
 		Addr:    "localhost:8080",
@@ -79,15 +76,13 @@ func main() {
 
 	server.Close()
 
-	close(HitBuffer)
+	close(analytics.HitBuffer)
 
 	<-done
 
 	log.Println("flushed...")
 }
 
-func pixelHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "image/gif")
-	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
-	w.Write(pixelByte)
+func visitHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("hello visitor"))
 }
