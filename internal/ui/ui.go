@@ -39,8 +39,58 @@ var dashboardTemplate = `
 					<div class="stat-card"><h3>Visits (Sessions)</h3><p>{{.UniqueSessions}}</p></div>
 					<div class="stat-card"><h3>Avg Session Time</h3><p>{{.AvgSessionTime}}</p></div>
 					<div class="stat-card"><h3>Bounce Rate</h3><p>{{printf "%.1f" .BounceRate}}%</p></div>
-					<div class="stat-card"><h3>Active Users</h3><p>Live</p></div> </div>
+					<div class="stat-card"><h3>Active Users</h3><p>{{.Active}}</p></div> </div>
 	</div>
+
+	<div class="main-card">
+		<h2>Top Content (Performance & Popularity)</h2>
+			<table>
+					<thead>
+							<tr>
+									<th>URL Path</th>
+									<th>Views</th>
+							</tr>
+					</thead>
+					<tbody>
+							{{range .TopPages}}
+							<tr>
+									<td>{{.Path}}</td>
+									<td><strong>{{.Views}}</strong></td>
+							</tr>
+							{{end}}
+					</tbody>
+			</table>
+	</div>
+
+	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+	<div class="main-card">
+			<h3>Top 10 Countries</h3>
+			<div style="max-height: 300px;">
+					<canvas id="countryChart"></canvas>
+			</div>
+	</div>
+
+	<script>
+			const ctx = document.getElementById('countryChart').getContext('2d');
+			new Chart(ctx, {
+					type: 'bar',
+					data: {
+							labels: [{{range .TopCountries}} "{{.Country}}", {{end}}],
+							datasets: [{
+									label: 'Visitors',
+									data: [{{range .TopCountries}} {{.Count}}, {{end}}],
+									backgroundColor: '#007bff'
+							}]
+					},
+					options: {
+							indexAxis: 'y',
+							responsive: true,
+							maintainAspectRatio: false
+					}
+			});
+	</script>
+
 </body>
 </html>
 `
@@ -55,9 +105,14 @@ type PerformanceStat struct {
 	Avg_dur float64
 }
 
+type CountryStat struct {
+	Country string
+	Count   int
+}
 type DashboardData struct {
 	TopPages       []PageStat
 	Performance    []PerformanceStat
+	TopCountries   []CountryStat
 	TotalCount     int64
 	UniqueVisitors int64
 	AvgLatency     float32
@@ -66,24 +121,29 @@ type DashboardData struct {
 	UniqueSessions int
 	AvgSessionTime string
 	BounceRate     float64
+	Active         int
 }
 
 func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	data := DashboardData{}
 
+	testData()
+
 	topPages(&data.TopPages)
 
-	totalCount(&data.TotalCount)
+	fetchGlobalMetrics(&data)
 
 	avgLatency(&data.AvgLatency)
 
 	errorRate(&data.ErrorRate)
 
-	uniqueVisitors(&data.UniqueVisitors)
-
 	performance(&data.Performance)
 
 	uniqueSessions(&data.UniqueSessions, &data.AvgSessionTime)
+
+	bounceRate(&data.BounceRate)
+
+	topCountries(&data.TopCountries)
 
 	tmpl := template.Must(template.New("dashboard").Parse(dashboardTemplate))
 	tmpl.Execute(w, data)

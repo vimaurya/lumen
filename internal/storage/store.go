@@ -13,10 +13,11 @@ var DB *sql.DB
 
 func InitDB() error {
 	var err error
-	DB, err = sql.Open("sqlite", "analytics.db")
+	DB, err = sql.Open("sqlite", ":memory:")
 	if err != nil {
 		return err
 	}
+
 	DB.Exec("journal_mode=WAL;")
 	DB.Exec("synchronous=NORMAL;")
 
@@ -40,9 +41,18 @@ func InitDB() error {
 	`
 	_, err = DB.Exec(query)
 	if err != nil {
-		log.Printf("failed to create table : %v", err)
+		log.Fatalf("CRITICAL SQL ERROR: %v", err)
 	}
-	return err
+
+	indexes := `
+			CREATE INDEX IF NOT EXISTS idx_hit_timestamp ON hit(timestamp);
+				CREATE INDEX IF NOT EXISTS idx_hit_sessionid ON hit(sessionid);
+	`
+
+	DB.Exec(indexes)
+
+	log.Println("Database successfully created in memory.")
+	return nil
 }
 
 func StartWorker() {
