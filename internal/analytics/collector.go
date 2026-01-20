@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 
@@ -48,6 +49,19 @@ func extractIP(ip string) string {
 		return ip
 	}
 
+	return host
+}
+
+func ngrokextractIP(r *http.Request) string {
+	adrs := r.Header.Get("X-Forwarded-For")
+	if adrs != "" {
+		return strings.Split(adrs, ",")[0]
+	}
+
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
 	return host
 }
 

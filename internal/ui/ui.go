@@ -127,7 +127,7 @@ type DashboardData struct {
 func DashboardHandler(w http.ResponseWriter, r *http.Request) {
 	data := DashboardData{}
 
-	testData()
+	// testData()
 
 	topPages(&data.TopPages)
 
