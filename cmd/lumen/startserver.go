@@ -6,6 +6,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/vimaurya/lumen/internal/analytics"
 	"github.com/vimaurya/lumen/internal/config"
@@ -23,6 +24,14 @@ func startServer(cfg *config.Config) {
 		originalDirector(req)
 
 		req.Header.Set("X-Lumen-Secret", cfg.Security.LumenSecret)
+
+		if !cfg.Proxy[0].PreservePath {
+			newPath := strings.TrimPrefix(req.URL.Path, cfg.Proxy[0].Prefix)
+			if !strings.HasPrefix(newPath, "/") {
+				newPath = "/" + newPath
+			}
+			req.URL.Path = newPath
+		}
 
 		req.Host = target.Host
 	}
