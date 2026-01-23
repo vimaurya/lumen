@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/vimaurya/lumen/internal/config"
 )
 
 type Hit struct {
@@ -31,27 +33,13 @@ type statusWriter struct {
 	Status int
 }
 
-var ignoredExtensions = map[string]bool{
-	".js":    true,
-	".css":   true,
-	".map":   true,
-	".png":   true,
-	".jpg":   true,
-	".jpeg":  true,
-	".ico":   true,
-	".svg":   true,
-	".woff":  true,
-	".woff2": true,
-	".json":  true,
-}
-
 func generateHash(ip, ua string) string {
 	salt := time.Now().Format("2006-01-02")
 	hash := sha256.Sum256([]byte(ip + ua + salt))
 	return fmt.Sprintf("%x", hash)
 }
 
-func AnalyticsMiddleware(next http.Handler) http.Handler {
+func AnalyticsMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 
@@ -60,8 +48,8 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 			ext = strings.ToLower(path[dot:])
 		}
 
-		if path == "/admin" ||
-			ignoredExtensions[ext] {
+		if path == cfg.Server.AdminPath ||
+			cfg.Security.IgnoredExtensions[ext] {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -79,7 +67,7 @@ func AnalyticsMiddleware(next http.Handler) http.Handler {
 		ua := r.Header.Get("User-Agent")
 		ip := ngrokextractIP(r)
 
-//		ip := r.RemoteAddr
+		//		ip := r.RemoteAddr
 		ref := r.Header.Get("Referer")
 		method := r.Method
 
