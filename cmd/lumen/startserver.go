@@ -10,6 +10,7 @@ import (
 
 	"github.com/vimaurya/lumen/internal/analytics"
 	"github.com/vimaurya/lumen/internal/config"
+	"github.com/vimaurya/lumen/internal/security"
 	"github.com/vimaurya/lumen/internal/ui"
 )
 
@@ -39,7 +40,7 @@ func startServer(cfg *config.Config) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/visit", visitHandler)
-	mux.HandleFunc(cfg.Server.AdminPath, ui.DashboardHandler)
+	mux.HandleFunc(cfg.Server.AdminPath, security.PasswordProtection(cfg, ui.DashboardHandler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		proxy.ServeHTTP(w, r)
 	})
