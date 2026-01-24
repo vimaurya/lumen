@@ -45,7 +45,11 @@ func startServer(cfg *config.Config) {
 		proxy.ServeHTTP(w, r)
 	})
 
-	wrappedMux := analytics.AnalyticsMiddleware(mux, cfg)
+	analyticsMux := analytics.AnalyticsMiddleware(mux, cfg)
+
+	wrappedMux := security.RateLimiter(analyticsMux, cfg)
+
+	security.CleanUpVisitors()
 
 	server = &http.Server{
 		Addr:    "localhost:" + strconv.Itoa(cfg.Server.Port),
