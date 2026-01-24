@@ -65,9 +65,10 @@ func AnalyticsMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 		duration := time.Since(start).Milliseconds()
 
 		ua := r.Header.Get("User-Agent")
-		ip := ngrokextractIP(r)
+		// ip := ngrokextractIP(r)
 
-		//		ip := r.RemoteAddr
+		ip := ExtractIP(r.RemoteAddr)
+
 		ref := r.Header.Get("Referer")
 		method := r.Method
 
@@ -87,12 +88,12 @@ func AnalyticsMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 				Browser:         client.UserAgent.Family,
 				OperatingSystem: client.Os.Family,
 				Device:          client.Device.Family,
-				Country:         getCountry(extractIP(ip)),
+				Country:         getCountry(ip),
 				Status:          sw.Status,
 				Duration:        duration,
 				Method:          method,
 				RequestSize:     int(requestSize),
-				SessionId:       getSessionId(extractIP(ip), ua),
+				SessionId:       getSessionId(ip, ua),
 				IsBot:           isBot(ua),
 			})
 		}()

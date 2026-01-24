@@ -43,7 +43,7 @@ func isBot(ua string) bool {
 	return isBot
 }
 
-func extractIP(ip string) string {
+func ExtractIP(ip string) string {
 	host, _, err := net.SplitHostPort(ip)
 	if err != nil {
 		return ip
