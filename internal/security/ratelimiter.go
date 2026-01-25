@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vimaurya/lumen/internal/analytics"
 	"github.com/vimaurya/lumen/internal/config"
 )
 
@@ -58,7 +57,7 @@ func upLimit(ip string) bool {
 
 func RateLimiter(next http.Handler, cfg *config.Config) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip := analytics.ExtractIP(r.RemoteAddr)
+		ip := getIP(r)
 
 		path := r.URL.Path
 
@@ -79,6 +78,13 @@ func RateLimiter(next http.Handler, cfg *config.Config) http.HandlerFunc {
 		}
 		next.ServeHTTP(w, r)
 	}
+}
+
+func getIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		return xff
+	}
+	return r.RemoteAddr
 }
 
 func CleanUpVisitors() {

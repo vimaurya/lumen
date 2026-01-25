@@ -56,7 +56,7 @@ func InitDB() error {
 }
 
 func StartWorker() {
-	batch := make([]analytics.Hit, 0, 100)
+	batch := make([]analytics.Hit, 0, 2000)
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
@@ -68,7 +68,7 @@ func StartWorker() {
 				return
 			}
 			batch = append(batch, hit)
-			if len(batch) > 100 {
+			if len(batch) > 1500 {
 				err := flush(batch)
 				if err != nil {
 					log.Printf("failed to flush into database... %v", err)
