@@ -7,22 +7,26 @@ import (
 )
 
 type Proxy struct {
-	Name         string `yaml:"name"`
-	Prefix       string `yaml:"prefix"`
-	Target       string `yaml:"target"`
-	PreservePath bool   `yaml:"preserve_path"`
+	Name         string   `yaml:"name"`
+	Prefix       string   `yaml:"prefix"`
+	Targets      []string `yaml:"target"`
+	PreservePath bool     `yaml:"preserve_path"`
+}
+
+type Security struct {
+	LumenSecret       string          `yaml:"lumen_secret"`
+	IgnoredExtensions map[string]bool `yaml:"ignored_extensions"`
+}
+
+type Server struct {
+	Port      int    `yaml:"port"`
+	AdminPath string `yaml:"admin_path"`
 }
 
 type Config struct {
-	Server struct {
-		Port      int    `yaml:"port"`
-		AdminPath string `yaml:"admin_path"`
-	} `yaml:"server"`
-	Security struct {
-		LumenSecret       string          `yaml:"lumen_secret"`
-		IgnoredExtensions map[string]bool `yaml:"ignored_extensions"`
-	} `yaml:"security"`
-	Proxy []Proxy `yaml:"proxy"`
+	Server   Server   `yaml:"server"`
+	Security Security `yaml:"security"`
+	Proxy    []Proxy  `yaml:"proxy"`
 }
 
 func LoadConfig(path string) (*Config, error) {
