@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/vimaurya/lumen/internal/config"
@@ -11,12 +12,18 @@ import (
 )
 
 func runInit() {
-	var target string
-	prompt := &survey.Input{
-		Message: "What is your target backend URL? (e.g., http://localhost:8081)",
-		Default: "http://localhost:8081",
+	var targetsInput string
+	targetPrompt := &survey.Input{
+		Message: "Enter target backend URLs (comma-separated):",
+		Default: "http://localhost:8081, http://localhost:8082",
 	}
-	survey.AskOne(prompt, &target)
+	survey.AskOne(targetPrompt, &targetsInput)
+
+	rawTargets := strings.Split(targetsInput, ",")
+	var targets []string
+	for _, t := range rawTargets {
+		targets = append(targets, strings.TrimSpace(t))
+	}
 
 	var secret string
 	secretPrompt := &survey.Password{
@@ -46,7 +53,7 @@ func runInit() {
 
 	cfg.Proxy = append(cfg.Proxy, config.Proxy{
 		Name:         "nimbus",
-		Target:       target,
+		Targets:      targets,
 		PreservePath: true,
 	})
 

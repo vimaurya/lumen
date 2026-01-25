@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vimaurya/lumen/internal/analytics"
+	"github.com/vimaurya/lumen/internal/balancer"
 	"github.com/vimaurya/lumen/internal/config"
 	"github.com/vimaurya/lumen/internal/security"
 	"github.com/vimaurya/lumen/internal/ui"
@@ -17,12 +18,41 @@ import (
 var server *http.Server
 
 func startServer(cfg *config.Config) {
-	target, _ := url.Parse(cfg.Proxy[0].Target)
-	proxy := httputil.NewSingleHostReverseProxy(target)
+	balancers := make(map[string]*balancer.Balancer)
 
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
+	for _, p := range cfg.Proxy {
+		b := &balancer.Balancer{}
+		for _, target := range p.Targets {
+			u, err := url.Parse(target)
+			if err != nil {
+				log.Fatalf("Invalid target URL %s : %v", target, err)
+			}
+			b.Targets = append(b.Targets, u)
+		}
+		balancers[p.Prefix] = b
+	}
+
+	rp := &httputil.ReverseProxy{}
+
+	rp.Director = func(req *http.Request) {
+		var matched *config.Proxy
+
+		for i := range cfg.Proxy {
+			if strings.HasPrefix(req.URL.Path, cfg.Proxy[i].Prefix) {
+				matched = &cfg.Proxy[i]
+				break
+			}
+		}
+
+		if matched == nil {
+			return
+		}
+
+		target := balancers[matched.Prefix].Next()
+
+		req.URL.Scheme = target.Scheme
+		req.URL.Host = target.Host
+		req.Host = target.Host
 
 		req.Header.Set("X-Lumen-Secret", cfg.Security.LumenSecret)
 
@@ -42,7 +72,7 @@ func startServer(cfg *config.Config) {
 	mux.HandleFunc("/visit", visitHandler)
 	mux.HandleFunc(cfg.Server.AdminPath, security.PasswordProtection(cfg, ui.DashboardHandler))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
+		rp.ServeHTTP(w, r)
 	})
 
 	analyticsMux := analytics.AnalyticsMiddleware(mux, cfg)

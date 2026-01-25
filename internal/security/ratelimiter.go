@@ -23,9 +23,9 @@ var (
 )
 
 func upLimit(ip string) bool {
-	defaultLimit := 10
-	coolDownPeriod := 5 * time.Second
-	bonus := 5
+	defaultLimit := 15000
+	coolDownPeriod := 3 * time.Second
+	bonus := 5000
 	mu.Lock()
 	defer mu.Unlock()
 
@@ -40,7 +40,11 @@ func upLimit(ip string) bool {
 	if v.count > v.limit {
 		log.Print("already rate limited")
 		if time.Since(v.lastSeen) > coolDownPeriod {
-			v.count = v.limit - bonus
+			v.count -= bonus
+			if v.count < 0 {
+				v.count = 0
+			}
+
 			v.lastSeen = time.Now()
 			return false
 		}
@@ -78,13 +82,13 @@ func RateLimiter(next http.Handler, cfg *config.Config) http.HandlerFunc {
 }
 
 func CleanUpVisitors() {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(1 * time.Minute)
 
 	go func() {
 		for range ticker.C {
 			mu.Lock()
 			for ip, v := range counter {
-				if time.Since(v.lastSeen) > 60*time.Second {
+				if time.Since(v.lastSeen) > 5*time.Minute {
 					delete(counter, ip)
 				}
 			}

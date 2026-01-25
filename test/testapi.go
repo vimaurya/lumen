@@ -4,12 +4,25 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 )
 
 func main() {
-	port := "localhost:8081"
+	var port string
+	if len(os.Args) > 1 {
+		command := os.Args[1]
 
-	lumensecret := "verysecret5"
+		switch command {
+		case "port":
+			port = os.Args[2]
+		default:
+			log.Printf("unknown command: %s", command)
+			return
+		}
+	}
+
+	host := "localhost:" + port
+	lumensecret := "verysecret45"
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received: %s %s", r.Method, r.URL.Path)
@@ -17,7 +30,7 @@ func main() {
 		log.Printf("Secret Header: %s", secret)
 
 		if secret != lumensecret {
-			w.Write([]byte("{error : access denied. requests must go through lumen}"))
+			http.Error(w, "access denied, requests must go through lumen", http.StatusForbidden)
 			return
 		}
 
@@ -30,6 +43,6 @@ func main() {
 		}`, r.URL.Path, r.Header.Get("X-Lumen-Secret"), r.Header)
 	})
 
-	log.Printf("Test API listening on %s", port)
-	log.Fatal(http.ListenAndServe(port, nil))
+	log.Printf("Test API listening on %s", host)
+	log.Fatal(http.ListenAndServe(host, nil))
 }
