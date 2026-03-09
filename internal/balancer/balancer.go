@@ -94,6 +94,7 @@ func RecordStatus(prefix, targetUrl string, status int) {
 				targetServer.state = 0
 				targetServer.failureCount = 0
 			}
+			targetServer.mu.Unlock()
 		}
 	}
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -28,13 +29,13 @@ func startServer(cfg *config.Config) {
 				log.Fatalf("Invalid target URL %s : %v", target, err)
 			}
 
-			target := balancer.Target{
+			target := &balancer.Target{
 				URL:              u,
 				FailureThreshold: 5,
-				Timeout:          3600 * time.Second,
+				Timeout:          3 * time.Second,
 			}
 
-			b.Targets = append(b.Targets, &target)
+			b.Targets = append(b.Targets, target)
 		}
 		balancer.Balancers[p.Prefix] = b
 	}
@@ -57,6 +58,7 @@ func startServer(cfg *config.Config) {
 
 		target := balancer.Balancers[matched.Prefix].Next()
 
+		fmt.Println("the target server is : ", target.Host)
 		ctx := context.WithValue(req.Context(), "lumen-prefix", matched.Prefix)
 		ctx = context.WithValue(req.Context(), "lumen-target", target.String())
 
@@ -78,6 +80,25 @@ func startServer(cfg *config.Config) {
 		}
 
 		req.Host = target.Host
+	}
+
+	rp.ModifyResponse = func(res *http.Response) error {
+		req := res.Request
+		if targetURL, ok := req.Context().Value("lumen-target").(string); ok {
+			prefix, _ := req.Context().Value("lumen-prefix").(string)
+			balancer.RecordStatus(prefix, targetURL, res.StatusCode)
+		}
+		return nil
+	}
+
+	rp.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		if targetURL, ok := r.Context().Value("lumen-target").(string); ok {
+			prefix, _ := r.Context().Value("lumen-prefix").(string)
+
+			balancer.RecordStatus(prefix, targetURL, http.StatusBadGateway)
+		}
+
+		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
 	}
 
 	mux := http.NewServeMux()
