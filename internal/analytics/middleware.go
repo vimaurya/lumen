@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/vimaurya/lumen/internal/balancer"
 	"github.com/vimaurya/lumen/internal/config"
 )
 
@@ -59,6 +60,11 @@ func AnalyticsMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 		sw := &statusWriter{ResponseWriter: w, Status: http.StatusOK}
 
 		next.ServeHTTP(sw, r)
+
+		if targetURL, ok := r.Context().Value("lumen-target").(string); ok {
+			prefix, _ := r.Context().Value("lumen-prefix").(string)
+			balancer.RecordStatus(prefix, targetURL, sw.Status)
+		}
 
 		log.Printf("path : %s status : %v", path, sw.Status)
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/debug"
 
 	"github.com/oschwald/geoip2-golang"
 	"github.com/ua-parser/uap-go/uaparser"
@@ -23,7 +24,12 @@ func main() {
 			runInit()
 			return
 		case "version":
-			fmt.Println("Lumen v0.1.0")
+			if info, ok := debug.ReadBuildInfo(); ok {
+				fmt.Printf("Lumen Version: %s\n", info.Main.Version)
+				fmt.Printf("Go Version:    %s\n", info.GoVersion)
+				return
+			}
+			fmt.Println("Lumen v0.1.0 (build info unavailable)")
 			return
 		}
 	}
