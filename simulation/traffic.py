@@ -5,7 +5,7 @@ import time
 
 TARGET_URL = "http://localhost:8080/api/v1/34"
 NUM_USERS = 10          
-REQUESTS_PER_USER = 20000
+REQUESTS_PER_USER = 1000
 CONCURRENCY = 50
 
 def generate_fake_ip():

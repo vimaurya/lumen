@@ -3,7 +3,6 @@ package analytics
 import (
 	"crypto/sha256"
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -60,7 +59,11 @@ func AnalyticsMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 
 		next.ServeHTTP(sw, r)
 
-		log.Printf("path : %s status : %v", path, sw.Status)
+		// if targetURL, ok := r.Context().Value("lumen-target").(string); ok {
+		// 	prefix, _ := r.Context().Value("lumen-prefix").(string)
+		// 	fmt.Println("this is the prefix : ", prefix)
+		// 	balancer.RecordStatus(prefix, targetURL, sw.Status)
+		// }
 
 		duration := time.Since(start).Milliseconds()
 
@@ -71,8 +74,6 @@ func AnalyticsMiddleware(next http.Handler, cfg *config.Config) http.Handler {
 
 		ref := r.Header.Get("Referer")
 		method := r.Method
-
-		log.Printf("this is the ip : %s", ip)
 
 		requestSize := r.ContentLength
 		go func() {
